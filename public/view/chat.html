@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        #chatWindow {
+            border: 1px solid #ddd;
+            padding: 10px;
+            height: 300px;
+            overflow-y: scroll;
+            margin-bottom: 10px;
+        }
+        #typingIndicator {
+            font-style: italic;
+        }
+        .chat-message {
+            margin-bottom: 5px;
+        }
+        .chat-message strong {
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <h2 class="mb-4">Chat Room</h2>
+        <div class="form-group">
+            <label for="room">Select Room:</label>
+            <select class="form-control" id="room">
+                <option value="devops">DevOps</option>
+                <option value="cloud computing">Cloud Computing</option>
+                <option value="covid19">Covid19</option>
+                <option value="sports">Sports</option>
+                <option value="nodeJS">NodeJS</option>
+            </select>
+            <button id="joinRoom" class="btn btn-primary mt-2">Join Room</button>
+            <button id="leaveRoom" class="btn btn-secondary mt-2">Leave Room</button>
+        </div>
+
+        <div id="chatWindow"></div>
+        <div class="form-group">
+            <label for="message">Message:</label>
+            <input type="text" class="form-control" id="message">
+            <button id="sendMessage" class="btn btn-success mt-2">Send</button>
+        </div>
+        <div id="typingIndicator"></div>
+        <button id="logout" class="btn btn-danger mt-2">Logout</button>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const user = JSON.parse(localStorage.getItem('user'));
+        let currentRoom = '';
+
+        document.getElementById('joinRoom').addEventListener('click', () => {
+            const room = document.getElementById('room').value;
+            if (currentRoom) {
+                socket.emit('leaveRoom', currentRoom);
+                console.log(`Leaving room: ${currentRoom}`);
+            }
+            socket.emit('joinRoom', room);
+            currentRoom = room;
+            console.log(`Joined room: ${currentRoom}`);
+            updateChatWindow(`Joined room: ${room}`);
+        });
+
+        document.getElementById('leaveRoom').addEventListener('click', () => {
+            if (currentRoom) {
+                socket.emit('leaveRoom', currentRoom);
+                console.log(`Left room: ${currentRoom}`);
+                updateChatWindow(`Left room: ${currentRoom}`);
+                currentRoom = '';
+            }
+        });
+
+        document.getElementById('sendMessage').addEventListener('click', () => {
+            const message = document.getElementById('message').value;
+            if (currentRoom && message) {
+                socket.emit('chatMessage', { from_user: user.username, room: currentRoom, message });
+                document.getElementById('message').value = '';
+                console.log(`Message sent: ${message}`);
+            }
+        });
+
+        document.getElementById('message').addEventListener('input', () => {
+            if (currentRoom) {
+                socket.emit('typing', { room: currentRoom, user: user.username });
+                console.log(`Typing in room: ${currentRoom}`);
+            }
+        });
+
+        socket.on('message', (msg) => {
+            updateChatWindow(`<strong>${msg.from_user}:</strong> ${msg.message}`);
+            console.log('Message received:', msg);
+        });
+
+        socket.on('typing', (data) => {
+            document.getElementById('typingIndicator').innerText = `${data.user} is typing...`;
+            console.log('Typing indicator:', data);
+        });
+
+        document.getElementById('logout').addEventListener('click', () => {
+            localStorage.removeItem('user');
+            window.location.href = '/view/login.html';
+            console.log('User logged out');
+        });
+
+        function updateChatWindow(message) {
+            const chatWindow = document.getElementById('chatWindow');
+            chatWindow.innerHTML += `<div class="chat-message">${message}</div>`;
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+    </script>
+</body>
+</html>
